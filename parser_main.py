@@ -1,12 +1,11 @@
-import random # if config.py changed
-import requests
-import json
-from config import *
+from parser_config import *
+from parser_utils import *
 import os
 import math
 import time
 from tqdm import tqdm
 from colorama import Fore, init
+
 
 init(autoreset=True)
 
@@ -30,12 +29,9 @@ def get_data(categories_ids, region, saved_file_name):
             'doTranslit': 'true',
             'context': 'v2dzaG9wX2lkZFM5NTVsY2F0ZWdvcnlfaWRzn2MyMDX/ZmNhdF9JZGMyMDX/',
         }
-
-        response = s.get('https://www.mvideo.ru/bff/products/v2/search', params=params,
-                         cookies=cookies, headers=headers)
-        #print(response.status_code)
-        response = response.json()
-
+        response = try_request(s, 'get', 'https://www.mvideo.ru/bff/products/v2/search',
+                               params=params, cookies=cookies, headers=headers)
+        shutdown_scenario(response, saved_file_name, products)
         total_items = response.get('body').get('total')
 
         total_pages = math.ceil(total_items / 48)
@@ -54,11 +50,9 @@ def get_data(categories_ids, region, saved_file_name):
                 'doTranslit': 'true',
                 'context': 'v2dzaG9wX2lkZFM5NTVsY2F0ZWdvcnlfaWRzn2MyMDX/ZmNhdF9JZGMyMDX/',
             }
-
-            response = s.get('https://www.mvideo.ru/bff/products/v2/search', params=params, cookies=cookies,
-                            headers=headers)
-            #print(response.status_code)
-            response = response.json()
+            response = try_request(s, 'get', 'https://www.mvideo.ru/bff/products/v2/search',
+                                   params=params, cookies=cookies, headers=headers)
+            shutdown_scenario(response, saved_file_name, products)
             products_ids_list = response.get('body').get('products')
 
             json_data = {
@@ -76,9 +70,9 @@ def get_data(categories_ids, region, saved_file_name):
                     'propertiesPortionSize': 5,
                 },
             }
-
-            response = s.post('https://www.mvideo.ru/bff/product-details/list', cookies=cookies, headers=headers,
-                              json=json_data).json()
+            response = try_request(s, 'post', 'https://www.mvideo.ru/bff/product-details/list',
+                                   cookies=cookies, headers=headers, json=json_data)
+            shutdown_scenario(response, saved_file_name, products)
 
             parsed_products = {
                 i.get('productId'): {
@@ -98,12 +92,10 @@ def get_data(categories_ids, region, saved_file_name):
                 'isPromoApplied': 'true',
             }
 
-            time.sleep(random.uniform(3, 10))
-
-            response = s.get('https://www.mvideo.ru/bff/products/prices', params=params, cookies=cookies,
-                             headers=headers)
-            #print(response.status_code)
-            response = response.json()
+            time.sleep(random.uniform(3,5))
+            response = try_request(s, 'get', 'https://www.mvideo.ru/bff/products/prices',
+                                   params=params, cookies=cookies, headers=headers)
+            shutdown_scenario(response, saved_file_name, products)
             prices = response.get('body').get('materialPrices')
 
             prices_map = {
@@ -120,17 +112,14 @@ def get_data(categories_ids, region, saved_file_name):
         progress_bar.close()
         tqdm.write(f'{Fore.LIGHTGREEN_EX}PARSING CATEGORY {category}: DONE\n')
 
-    with open(f'data/{saved_file_name}.json', 'w', encoding='utf-8') as f:
-        json.dump(products, f, indent=4, ensure_ascii=False)
+    save_data(saved_file_name, products)
     tqdm.write(f'{Fore.LIGHTGREEN_EX}PARSING CATEGORIES IN REGION {region}: DONE\n'
                f'DATA SAVED IN data/{saved_file_name}.json\n')
 
 def prices_compare(file_old, file_new):
-    with open(f'data/{file_old}.json', 'r', encoding='utf-8') as f:
-        products_old = json.load(f)
+    products_old = read_data(file_old)
 
-    with open(f'data/{file_new}.json', 'r', encoding='utf-8') as f:
-        products_new = json.load(f)
+    products_new = read_data(file_new)
 
     diff_products = {}
 
@@ -146,9 +135,7 @@ def prices_compare(file_old, file_new):
                     }
                 })
 
-    with open('data/prices_diff.json', 'w', encoding='utf-8') as f:
-        json.dump(diff_products, f, indent=4, ensure_ascii=False)
-
+    save_data('prices_diff', diff_products)
     tqdm.write(f'{Fore.LIGHTGREEN_EX}DIFFERENCES FOUND: {len(diff_products)}\nDATA SAVED IN data/prices_diff.json')
 
 
