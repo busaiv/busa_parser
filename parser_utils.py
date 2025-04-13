@@ -1,6 +1,8 @@
 import time
 import requests
 import json
+from tqdm import tqdm
+from colorama import Fore
 
 def try_request(session, request_type, url, tries=5, **kwargs):
     while tries > 0:
@@ -10,16 +12,24 @@ def try_request(session, request_type, url, tries=5, **kwargs):
             elif request_type == 'get':
                 response = session.get(url, **kwargs).json()
             else:
-                return f'{session} is unsupported type for session'
+                tqdm.write(f'{session} is unsupported type for session')
+                return None
             return response
-        except ConnectionError as e:
-            time.sleep(20)
+        except requests.exceptions.RequestException as e:
+            tqdm.write(f'{Fore.LIGHTYELLOW_EX}\n[ERROR] MaxRetryError: waiting for 60 seconds\nretries left: {tries}'
+                       f'\ndetails: {e}\n')
+            time.sleep(60)
             tries -= 1
-            return f'Retries left {tries} | {e}'
         except requests.exceptions.JSONDecodeError as e:
+            tqdm.write(f'\n{Fore.LIGHTYELLOW_EX}[ERROR] JSONDecodeError: waiting for 300 seconds\nretries left: {tries}'
+                       f'\ndetails: {e}\n')
             time.sleep(300)
             tries -= 1
-            return f'Retries left {tries} | {e}'
+        except Exception as e:
+            tqdm.write(f'\n{Fore.LIGHTYELLOW_EX}[ERROR]: waiting for 60 seconds\nretries left: {tries}'
+                       f'\n error details: {e}\n')
+            time.sleep(60)
+            tries -= 1
     return 'SHUTDOWN'
 
 def shutdown_scenario(response_data, file_name, parsed_data):
